@@ -4,6 +4,7 @@ import inspect
 from dataclasses import dataclass
 from typing import Any
 
+from pydantic import ValidationError
 
 @dataclass
 class Response:
@@ -36,10 +37,13 @@ class TestClient:
                     if payload is None:
                         continue
                     annotation = param.annotation
-                    if hasattr(annotation, "model_validate"):
-                        kwargs[name] = annotation.model_validate(payload)
-                    else:
-                        kwargs[name] = payload
+                    try:
+                        if hasattr(annotation, "model_validate"):
+                            kwargs[name] = annotation.model_validate(payload)
+                        else:
+                            kwargs[name] = payload
+                    except (ValidationError, ValueError) as exc:
+                        return Response(status_code=422, _payload={"detail": str(exc)})
                 result = route.handler(**kwargs)
                 if hasattr(result, "model_dump"):
                     result = result.model_dump()
